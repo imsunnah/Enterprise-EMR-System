@@ -14,7 +14,7 @@ class AuthController extends Controller
     public function showLogin(): Response
     {
         return Inertia::render('Auth/Login', [
-            'staffAccounts' => User::select('id', 'name', 'email', 'role', 'specialization')
+            'staffAccounts' => User::select('id', 'name', 'email', 'role', 'specialization', 'department')
                 ->where('is_active', true)
                 ->get(),
         ]);
@@ -35,8 +35,8 @@ class AuthController extends Controller
                 return redirect()->intended(route('doctor.encounters'));
             } elseif ($user->role === 'BILLER') {
                 return redirect()->intended(route('billing.index'));
-            } elseif ($user->role === 'NURSE' || $user->role === 'ADMIN') {
-                return redirect()->intended(route('clerk.queue'));
+            } elseif ($user->role === 'ADMIN') {
+                return redirect()->intended(route('admin.catalogs'));
             }
 
             return redirect()->intended(route('clerk.queue'));
@@ -53,7 +53,7 @@ class AuthController extends Controller
     public function switchRole(Request $request)
     {
         $request->validate([
-            'role' => 'required|in:ADMIN,DOCTOR,NURSE,BILLER',
+            'role' => 'required|in:ADMIN,DOCTOR,NURSE,RECEPTIONIST,BILLER',
         ]);
 
         $user = User::where('role', $request->role)->first();

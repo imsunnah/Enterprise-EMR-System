@@ -17,28 +17,29 @@ use App\Models\Prescription;
 use App\Models\PrescriptionItem;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\BillingEngine;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
+     * Seed the application's database with complete HMS workflow data.
      */
     public function run(): void
     {
-        // 1. Staff Users
+        // 1. Staff Users & Roles
         $admin = User::create([
             'name' => 'System Administrator',
             'email' => 'admin@emr.local',
             'password' => Hash::make('secret123'),
             'role' => 'ADMIN',
-            'department' => 'Administration',
+            'department' => 'Hospital Governance',
             'phone' => '+15550000001',
             'is_active' => true,
         ]);
 
-        $doctor = User::create([
+        $doctor1 = User::create([
             'name' => 'Dr. Sarah Jenkins, MD',
             'email' => 'doctor@emr.local',
             'password' => Hash::make('secret123'),
@@ -46,8 +47,34 @@ class DatabaseSeeder extends Seeder
             'department' => 'Internal Medicine',
             'specialization' => 'Cardiologist & General Physician',
             'license_number' => 'MD-749219',
-            'consultation_fee' => 75.00,
+            'consultation_fee' => 75.00, // New Patient Fee
+            'followup_fee' => 30.00,     // Report Visit / Follow-up Fee
             'phone' => '+15550000002',
+            'is_active' => true,
+        ]);
+
+        $doctor2 = User::create([
+            'name' => 'Dr. David Hayes, MD',
+            'email' => 'hayes@emr.local',
+            'password' => Hash::make('secret123'),
+            'role' => 'DOCTOR',
+            'department' => 'Neurology',
+            'specialization' => 'Consultant Neurologist',
+            'license_number' => 'MD-991204',
+            'consultation_fee' => 90.00,
+            'followup_fee' => 40.00,
+            'phone' => '+15550000005',
+            'is_active' => true,
+        ]);
+
+        $receptionist = User::create([
+            'name' => 'Sarah Connor',
+            'email' => 'receptionist@emr.local',
+            'password' => Hash::make('secret123'),
+            'role' => 'RECEPTIONIST',
+            'department' => 'Outpatient Registration & Cashier',
+            'specialization' => 'Front Desk Cashier',
+            'phone' => '+15550000006',
             'is_active' => true,
         ]);
 
@@ -68,8 +95,8 @@ class DatabaseSeeder extends Seeder
             'email' => 'biller@emr.local',
             'password' => Hash::make('secret123'),
             'role' => 'BILLER',
-            'department' => 'Revenue Cycle & Accounts',
-            'specialization' => 'Billing & Claims Specialist',
+            'department' => 'Revenue Cycle & Diagnostic Counter',
+            'specialization' => 'Diagnostic Billing Specialist',
             'phone' => '+15550000004',
             'is_active' => true,
         ]);
@@ -114,7 +141,7 @@ class DatabaseSeeder extends Seeder
                 'unit_price' => 15.00,
                 'discount_percentage' => 10.00,
                 'stock_quantity' => 310,
-                'description' => 'ACE inhibitor for management of essential hypertension and heart failure.',
+                'description' => 'ACE inhibitor for management of essential hypertension.',
             ],
             [
                 'brand_name' => 'Prilosec',
@@ -124,27 +151,17 @@ class DatabaseSeeder extends Seeder
                 'unit_price' => 14.50,
                 'discount_percentage' => 0.00,
                 'stock_quantity' => 150,
-                'description' => 'Proton-pump inhibitor for gastroesophageal reflux disease and ulcers.',
+                'description' => 'Proton-pump inhibitor for acid reflux.',
             ],
             [
-                'brand_name' => 'Zithromax',
-                'generic_name' => 'Azithromycin',
-                'dosage_form' => 'Tablet',
-                'strength' => '250mg',
-                'unit_price' => 22.00,
-                'discount_percentage' => 12.00,
-                'stock_quantity' => 95,
-                'description' => 'Macrolide antibiotic for respiratory tract and soft tissue infections.',
-            ],
-            [
-                'brand_name' => 'Tylenol Extra Strength',
-                'generic_name' => 'Paracetamol (Acetaminophen)',
+                'brand_name' => 'Tylenol Extra',
+                'generic_name' => 'Paracetamol',
                 'dosage_form' => 'Tablet',
                 'strength' => '500mg',
                 'unit_price' => 5.00,
                 'discount_percentage' => 0.00,
-                'stock_quantity' => 1200,
-                'description' => 'Analgesic and antipyretic for mild-to-moderate pain and pyrexia.',
+                'stock_quantity' => 1000,
+                'description' => 'Analgesic and antipyretic.',
             ],
         ];
 
@@ -184,21 +201,12 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'test_code' => 'LFT-004',
-                'test_name' => 'Liver Function Panel (ALT, AST, ALP, Bilirubin, Protein)',
+                'test_name' => 'Liver Function Panel (ALT, AST, Bilirubin, Protein)',
                 'category' => 'Biochemistry',
                 'standard_price' => 65.00,
                 'discount_percentage' => 5.00,
                 'specimen_type' => 'Serum',
                 'turnaround_hours' => 18,
-            ],
-            [
-                'test_code' => 'URINE-005',
-                'test_name' => 'Routine Urinalysis with Microscopic Examination',
-                'category' => 'Pathology',
-                'standard_price' => 25.00,
-                'discount_percentage' => 0.00,
-                'specimen_type' => 'Mid-stream Urine',
-                'turnaround_hours' => 4,
             ],
             [
                 'test_code' => 'CXR-006',
@@ -225,7 +233,7 @@ class DatabaseSeeder extends Seeder
             'is_verified' => true,
         ]);
 
-        // Family Profile 1: Self
+        // Household Profiles
         $patientSelf = Patient::create([
             'account_id' => $account->id,
             'mrn' => 'MRN-2026-10492',
@@ -245,7 +253,6 @@ class DatabaseSeeder extends Seeder
             'allergies' => 'Penicillin, Shellfish',
         ]);
 
-        // Family Profile 2: Spouse
         $patientSpouse = Patient::create([
             'account_id' => $account->id,
             'mrn' => 'MRN-2026-10493',
@@ -261,30 +268,11 @@ class DatabaseSeeder extends Seeder
             'emergency_contact_name' => 'Johnathan Miller',
             'emergency_contact_phone' => '+15551234567',
             'insurance_provider' => 'Blue Cross Blue Shield HealthNet',
-            'insurance_policy_number' => 'BCBS-9842104-B',
             'allergies' => 'None reported',
         ]);
 
-        // Family Profile 3: Child
-        $patientChild = Patient::create([
-            'account_id' => $account->id,
-            'mrn' => 'MRN-2026-10494',
-            'first_name' => 'Lucas',
-            'last_name' => 'Miller',
-            'date_of_birth' => '2017-08-03',
-            'gender' => 'MALE',
-            'blood_group' => 'O+',
-            'phone' => '+15551234567',
-            'address' => '742 Evergreen Terrace, Springfield',
-            'relationship_to_account_holder' => 'CHILD',
-            'emergency_contact_name' => 'Johnathan Miller',
-            'emergency_contact_phone' => '+15551234567',
-            'allergies' => 'Peanuts',
-        ]);
-
-        // Walk-in Patient (No Online Account)
         $patientWalkIn = Patient::create([
-            'account_id' => null, // Walk-in
+            'account_id' => null, // Standalone walk-in
             'mrn' => 'MRN-2026-20015',
             'first_name' => 'Robert',
             'last_name' => 'Sterling',
@@ -297,47 +285,67 @@ class DatabaseSeeder extends Seeder
             'emergency_contact_name' => 'Linda Sterling',
             'emergency_contact_phone' => '+15554443323',
             'insurance_provider' => 'Medicare Part B',
-            'insurance_policy_number' => 'MED-5541-X8',
             'allergies' => 'Sulfa drugs',
         ]);
 
-        // 5. Appointments
+        // 5. Phase 1 Appointments with Daily Serials & Tokens
+        // Appointment 1: Johnathan Miller (Serial #1) - New Patient Visit (Fee: $75)
         $app1 = Appointment::create([
             'patient_id' => $patientSelf->id,
-            'provider_id' => $doctor->id,
-            'appointment_date' => now()->subDays(2),
-            'status' => 'COMPLETED',
-            'type' => 'ROUTINE_CHECKUP',
-            'chief_complaint' => 'Annual hypertension follow-up and intermittent fatigue.',
-            'notes' => 'Patient fasting for lipid panel.',
+            'provider_id' => $doctor1->id,
+            'appointment_date' => now(),
+            'visit_type' => 'NEW_PATIENT',
+            'serial_number' => 1,
+            'token_number' => 'TK-001',
+            'fee_amount' => 75.00,
+            'payment_status' => 'PAID',
+            'paid_at' => now()->subHours(1),
+            'status' => 'IN_PROGRESS', // In Doctor consultation room!
+            'type' => 'CONSULTATION',
+            'chief_complaint' => 'Hypertension follow-up and chronic fatigue.',
         ]);
 
+        // Generate official Consultation invoice for App 1
+        BillingEngine::generateConsultationInvoice($app1, 'CREDIT_CARD', 'CC-AUTH-8821', 'Paid at front desk reception.');
+
+        // Appointment 2: Robert Sterling (Serial #2) - Walk-in New Visit (Fee: $75, Paid at reception -> CHECKED_IN)
         $app2 = Appointment::create([
             'patient_id' => $patientWalkIn->id,
-            'provider_id' => $doctor->id,
-            'appointment_date' => now()->addHours(2),
-            'status' => 'CHECKED_IN',
+            'provider_id' => $doctor1->id,
+            'appointment_date' => now(),
+            'visit_type' => 'NEW_PATIENT',
+            'serial_number' => 2,
+            'token_number' => 'TK-002',
+            'fee_amount' => 75.00,
+            'payment_status' => 'PAID',
+            'paid_at' => now()->subMinutes(20),
+            'status' => 'CHECKED_IN', // Waiting in queue (Next in Line)!
             'type' => 'WALK_IN',
-            'chief_complaint' => 'Mild chest discomfort and palpitations after exertion.',
-            'notes' => 'Priority triage vitals taken at front desk.',
+            'chief_complaint' => 'Chest tightness on exertion and dizziness.',
         ]);
+        BillingEngine::generateConsultationInvoice($app2, 'CASH', null, 'Cash paid at front desk.');
 
+        // Appointment 3: Claire Miller (Serial #3) - Report Visit / Follow-up (Fee: $30, Unpaid -> Awaiting Cashier)
         $app3 = Appointment::create([
-            'patient_id' => $patientChild->id,
-            'provider_id' => $doctor->id,
-            'appointment_date' => now()->addDays(3),
-            'status' => 'SCHEDULED',
-            'type' => 'PEDIATRIC_CHECKUP',
-            'chief_complaint' => 'Routine 9-year pediatric wellness exam and vaccination check.',
+            'patient_id' => $patientSpouse->id,
+            'provider_id' => $doctor1->id,
+            'appointment_date' => now()->addHours(1),
+            'visit_type' => 'REPORT_VISIT',
+            'serial_number' => 3,
+            'token_number' => 'TK-003',
+            'fee_amount' => 30.00,
+            'payment_status' => 'UNPAID',
+            'status' => 'SCHEDULED', // Waiting to pay at front desk
+            'type' => 'FOLLOW_UP',
+            'chief_complaint' => 'Review of fasting lab test reports.',
         ]);
 
-        // 6. Clinical Encounter for Johnathan Miller
+        // 6. Clinical Encounter & EHR for Johnathan Miller (Currently with Doctor)
         $encounter = Encounter::create([
             'patient_id' => $patientSelf->id,
-            'provider_id' => $doctor->id,
+            'provider_id' => $doctor1->id,
             'appointment_id' => $app1->id,
-            'encounter_date' => now()->subDays(2),
-            // Vitals
+            'encounter_date' => now(),
             'temperature_c' => 36.8,
             'heart_rate_bpm' => 74,
             'systolic_bp' => 134,
@@ -346,23 +354,20 @@ class DatabaseSeeder extends Seeder
             'weight_kg' => 84.5,
             'height_cm' => 178.0,
             'bmi' => 26.7,
-            // Structured SOAP Notes
-            'subjective_notes' => "Patient presents for 6-month hypertension review. Reports adhering to diet and mild exercise. Experiences afternoon fatigue. Denies chest pain, orthopnea, or shortness of breath. No visual disturbances.",
-            'objective_notes' => "General: Well-nourished, alert male in no acute distress.\nCardiovascular: Regular rate and rhythm, S1/S2 audible, no murmurs or gallops. Peripheral pulses intact bilaterally.\nRespiratory: Clear to auscultation bilaterally, no wheezes or rales.\nAbdomen: Soft, non-tender, non-distended, normoactive bowel sounds.\nNeurological: Cranial nerves II-XII grossly intact.",
-            'assessment_notes' => "1. Essential (primary) hypertension (ICD-10: I10) - Suboptimally controlled at 134/86.\n2. Type 2 diabetes mellitus without complications (ICD-10: E11.9) - Stable on oral hypoglycemics.\n3. Pure hypercholesterolemia (ICD-10: E78.0) - Follow-up lipid panel ordered.",
-            'plan_notes' => "1. Continue Lisinopril 10mg once daily in morning.\n2. Refill Metformin 850mg twice daily with meals.\n3. Add Atorvastatin 20mg once daily at bedtime.\n4. Ordered Fasting Comprehensive Lipid Panel and HbA1c.\n5. Follow-up consultation in 6 weeks with home blood pressure logs.",
+            'subjective_notes' => "Patient reports adherence to medications. Experiences afternoon fatigue. Denies chest pain or shortness of breath.",
+            'objective_notes' => "Alert, S1/S2 audible, regular rhythm. Chest clear bilaterally. Abdomen soft, non-tender.",
+            'assessment_notes' => "1. Essential hypertension (I10).\n2. Type 2 diabetes mellitus (E11.9).\n3. Hypercholesterolemia (E78.0).",
+            'plan_notes' => "1. Refill Lisinopril and Metformin.\n2. Prescribed Comprehensive Lipid Panel and HbA1c.\n3. Return with lab reports in 2 weeks (Report Visit).",
             'is_signed' => true,
-            'signed_at' => now()->subDays(2),
+            'signed_at' => now(),
         ]);
 
-        // Diagnoses (ICD-10)
         EncounterDiagnosis::create([
             'encounter_id' => $encounter->id,
             'icd10_code' => 'I10',
             'description' => 'Essential (primary) hypertension',
             'type' => 'PRIMARY',
         ]);
-
         EncounterDiagnosis::create([
             'encounter_id' => $encounter->id,
             'icd10_code' => 'E11.9',
@@ -370,25 +375,17 @@ class DatabaseSeeder extends Seeder
             'type' => 'SECONDARY',
         ]);
 
-        EncounterDiagnosis::create([
-            'encounter_id' => $encounter->id,
-            'icd10_code' => 'E78.0',
-            'description' => 'Pure hypercholesterolemia',
-            'type' => 'CHRONIC',
-        ]);
-
-        // Catalog-Linked E-Prescription
+        // Prescribe Medications
         $rx = Prescription::create([
             'encounter_id' => $encounter->id,
             'patient_id' => $patientSelf->id,
-            'provider_id' => $doctor->id,
-            'notes' => 'Take with water. Report any muscle aches or unexpected dizziness.',
+            'provider_id' => $doctor1->id,
+            'notes' => 'Take with morning meals.',
             'status' => 'ACTIVE',
         ]);
 
-        // Prescription Item 1: Lisinopril
-        $lisinopril = $medicineModels[3]; // Lisinopril 10mg
-        $rxItem1 = PrescriptionItem::create([
+        $lisinopril = $medicineModels[3];
+        PrescriptionItem::create([
             'prescription_id' => $rx->id,
             'medicine_id' => $lisinopril->id,
             'dosage' => '1 tablet',
@@ -397,37 +394,22 @@ class DatabaseSeeder extends Seeder
             'quantity' => 30,
             'unit_price' => $lisinopril->unit_price,
             'discount_percentage' => $lisinopril->discount_percentage,
-            'discount_amount' => round(($lisinopril->unit_price * 0.10) * 1, 2),
-            'total_price' => round(($lisinopril->unit_price * 1) - round(($lisinopril->unit_price * 0.10), 2), 2),
-            'instructions' => 'Take early morning with a glass of water.',
+            'discount_amount' => round(($lisinopril->unit_price * 0.10), 2),
+            'total_price' => round($lisinopril->unit_price - round(($lisinopril->unit_price * 0.10), 2), 2),
+            'instructions' => 'Take with a glass of water.',
         ]);
 
-        // Prescription Item 2: Metformin
-        $metformin = $medicineModels[1]; // Metformin 850mg
-        $rxItem2 = PrescriptionItem::create([
-            'prescription_id' => $rx->id,
-            'medicine_id' => $metformin->id,
-            'dosage' => '1 tablet',
-            'frequency' => 'Twice daily',
-            'duration_days' => 30,
-            'quantity' => 60,
-            'unit_price' => $metformin->unit_price,
-            'discount_percentage' => $metformin->discount_percentage,
-            'discount_amount' => round(($metformin->unit_price * 0.15) * 1, 2),
-            'total_price' => round(($metformin->unit_price * 1) - round(($metformin->unit_price * 0.15), 2), 2),
-            'instructions' => 'Take with morning and evening meals.',
-        ]);
-
-        // Lab Orders for Encounter
+        // Doctor Recommended Diagnostic Tests (Ready for Phase 4 Diagnostic Billing Counter!)
         $labOrder = LabOrder::create([
             'encounter_id' => $encounter->id,
             'patient_id' => $patientSelf->id,
-            'provider_id' => $doctor->id,
-            'clinical_notes' => 'Fasting status confirmed. Annual metabolic evaluation.',
+            'provider_id' => $doctor1->id,
+            'clinical_notes' => 'Annual lipid and glycemic control evaluation.',
             'priority' => 'ROUTINE',
-            'status' => 'COMPLETED',
+            'status' => 'ORDERED',
         ]);
 
+        // Test 1: Lipid Panel (UNBILLED - Patient can choose at diagnostic desk)
         $lipidTest = $labTestModels[1];
         LabOrderItem::create([
             'lab_order_id' => $labOrder->id,
@@ -436,12 +418,11 @@ class DatabaseSeeder extends Seeder
             'discount_percentage' => $lipidTest->discount_percentage,
             'discount_amount' => round($lipidTest->standard_price * 0.15, 2),
             'net_price' => round($lipidTest->standard_price - round($lipidTest->standard_price * 0.15, 2), 2),
-            'result_value' => 'Total: 215 mg/dL | HDL: 44 mg/dL | LDL: 138 mg/dL | Triglycerides: 165 mg/dL',
-            'reference_range' => 'Total < 200 mg/dL, LDL < 100 mg/dL',
-            'result_status' => 'ABNORMAL',
-            'result_notes' => 'Mild hyperlipidemia noted. Initiated Atorvastatin therapy.',
+            'billing_status' => 'UNBILLED',
+            'result_status' => 'PENDING',
         ]);
 
+        // Test 2: HbA1c (UNBILLED - Patient can choose at diagnostic desk)
         $hba1cTest = $labTestModels[2];
         LabOrderItem::create([
             'lab_order_id' => $labOrder->id,
@@ -450,88 +431,24 @@ class DatabaseSeeder extends Seeder
             'discount_percentage' => $hba1cTest->discount_percentage,
             'discount_amount' => round($hba1cTest->standard_price * 0.10, 2),
             'net_price' => round($hba1cTest->standard_price - round($hba1cTest->standard_price * 0.10, 2), 2),
-            'result_value' => '6.4%',
-            'reference_range' => '< 5.7% (Normal), 5.7 - 6.4% (Prediabetes), >= 6.5% (Diabetes)',
-            'result_status' => 'NORMAL',
-            'result_notes' => 'Glycemic control maintained within target range.',
+            'billing_status' => 'UNBILLED',
+            'result_status' => 'PENDING',
         ]);
 
-        // 7. Auto-Generated Revenue Cycle Invoice
-        $invoice = Invoice::create([
-            'invoice_number' => 'INV-2026-10048',
-            'patient_id' => $patientSelf->id,
-            'encounter_id' => $encounter->id,
-            'subtotal' => 170.50,
-            'discount_total' => 14.55,
-            'tax_amount' => 0.00,
-            'grand_total' => 155.95,
-            'amount_paid' => 155.95,
-            'balance_due' => 0.00,
-            'status' => 'PAID',
-            'payment_method' => 'INSURANCE',
-            'payment_reference' => 'BCBS-CLM-849102',
-            'paid_at' => now()->subDays(2),
-            'notes' => 'Co-pay cleared by Blue Cross HealthNet authorization.',
+        // Test 3: Chest X-Ray (UNBILLED)
+        $cxrTest = $labTestModels[4];
+        LabOrderItem::create([
+            'lab_order_id' => $labOrder->id,
+            'lab_test_id' => $cxrTest->id,
+            'standard_price' => $cxrTest->standard_price,
+            'discount_percentage' => $cxrTest->discount_percentage,
+            'discount_amount' => round($cxrTest->standard_price * 0.10, 2),
+            'net_price' => round($cxrTest->standard_price - round($cxrTest->standard_price * 0.10, 2), 2),
+            'billing_status' => 'UNBILLED',
+            'result_status' => 'PENDING',
         ]);
 
-        InvoiceItem::create([
-            'invoice_id' => $invoice->id,
-            'item_type' => 'CONSULTATION',
-            'description' => "Clinical Consultation - Dr. Sarah Jenkins, MD (Cardiologist & General Physician)",
-            'reference_id' => $encounter->id,
-            'quantity' => 1,
-            'unit_price' => 75.00,
-            'discount_amount' => 0.00,
-            'total_price' => 75.00,
-        ]);
-
-        InvoiceItem::create([
-            'invoice_id' => $invoice->id,
-            'item_type' => 'MEDICINE',
-            'description' => "Rx: Zestril (10mg) - 1 tablet, Once daily x 30d",
-            'reference_id' => $rxItem1->id,
-            'quantity' => 1,
-            'unit_price' => 15.00,
-            'discount_amount' => 1.50,
-            'total_price' => 13.50,
-        ]);
-
-        InvoiceItem::create([
-            'invoice_id' => $invoice->id,
-            'item_type' => 'MEDICINE',
-            'description' => "Rx: Glucophage (850mg) - 1 tablet, Twice daily x 30d",
-            'reference_id' => $rxItem2->id,
-            'quantity' => 1,
-            'unit_price' => 12.00,
-            'discount_amount' => 1.80,
-            'total_price' => 10.20,
-        ]);
-
-        InvoiceItem::create([
-            'invoice_id' => $invoice->id,
-            'item_type' => 'LAB_TEST',
-            'description' => "Lab Order: [LIPID-002] Comprehensive Lipid Panel (Biochemistry)",
-            'reference_id' => $lipidTest->id,
-            'quantity' => 1,
-            'unit_price' => 55.00,
-            'discount_amount' => 8.25,
-            'total_price' => 46.75,
-        ]);
-
-        InvoiceItem::create([
-            'invoice_id' => $invoice->id,
-            'item_type' => 'LAB_TEST',
-            'description' => "Lab Order: [HBA1C-003] Glycated Hemoglobin (HbA1c) (Biochemistry)",
-            'reference_id' => $hba1cTest->id,
-            'quantity' => 1,
-            'unit_price' => 45.00,
-            'discount_amount' => 4.50,
-            'total_price' => 40.50,
-        ]);
-
-        // 8. Immutable Audit Trail Entries
-        AuditLogger::log('INITIALIZE_EMR_SEED', 'System', $admin->id, ['environment' => 'development']);
-        AuditLogger::log('VIEW_PHI_PATIENT', 'Patient', $patientSelf->id, ['mrn' => $patientSelf->mrn]);
-        AuditLogger::log('SIGN_ENCOUNTER', 'Encounter', $encounter->id, ['signed_by' => $doctor->name]);
+        // 7. Audit Trail Entries
+        AuditLogger::log('INITIALIZE_HMS_SEED', 'System', $admin->id, ['workflow' => 'End-to-End HMS']);
     }
 }
