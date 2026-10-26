@@ -10,12 +10,29 @@
             </svg>
           </Link>
           <div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <h2 class="text-xl font-extrabold text-slate-900">
                 Clinical Encounter: {{ encounter.patient?.first_name }} {{ encounter.patient?.last_name }}
               </h2>
+              <span v-if="encounter.appointment?.serial_number" class="px-2.5 py-0.5 rounded font-mono text-xs font-black bg-teal-600 text-white shadow-xs">
+                Serial #{{ encounter.appointment.serial_number }}
+              </span>
+              <span v-if="encounter.appointment?.token_number" class="px-2 py-0.5 rounded font-mono text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                {{ encounter.appointment.token_number }}
+              </span>
               <span class="px-2 py-0.5 rounded font-mono text-xs font-bold bg-slate-100 text-slate-700">
                 {{ encounter.patient?.mrn }}
+              </span>
+              <span
+                v-if="encounter.appointment?.visit_type"
+                :class="[
+                  'px-2 py-0.5 rounded-full text-xs font-bold uppercase',
+                  encounter.appointment.visit_type === 'REPORT_VISIT'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                ]"
+              >
+                {{ encounter.appointment.visit_type === 'REPORT_VISIT' ? 'Report Visit' : 'First Visit' }}
               </span>
               <span :class="[
                 encounter.is_signed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300',

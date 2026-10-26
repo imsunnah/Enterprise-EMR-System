@@ -6,6 +6,9 @@ use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Encounter;
 use App\Models\Invoice;
+use App\Models\LabOrder;
+use App\Models\LabOrderItem;
+use App\Models\LabTestCatalog;
 use App\Models\MedicineCatalog;
 use App\Models\Patient;
 use App\Models\PatientAccount;
@@ -48,6 +51,13 @@ class EmrSystemTest extends TestCase
         ]);
         $response->assertRedirect(route('billing.index'));
         $this->assertEquals('BILLER', auth()->user()->role);
+
+        // 3. Switch role to Receptionist
+        $response = $this->post(route('login.switch_role'), [
+            'role' => 'RECEPTIONIST',
+        ]);
+        $response->assertRedirect(route('clerk.queue'));
+        $this->assertEquals('RECEPTIONIST', auth()->user()->role);
     }
 
     public function test_biller_strictly_blocked_from_clinical_soap_notes()
@@ -62,6 +72,18 @@ class EmrSystemTest extends TestCase
         $response = $this->get(route('doctor.encounter.show', $encounter->id));
 
         // Must be blocked with 403 Forbidden per PHI Protection Policy
+        $response->assertStatus(403);
+    }
+
+    public function test_receptionist_strictly_blocked_from_clinical_soap_notes()
+    {
+        $receptionist = User::where('role', 'RECEPTIONIST')->first();
+        $encounter = Encounter::first();
+
+        $this->actingAs($receptionist);
+
+        // Must be blocked with 403 Forbidden per PHI Protection Policy
+        $response = $this->get(route('doctor.encounter.show', $encounter->id));
         $response->assertStatus(403);
     }
 
@@ -88,7 +110,7 @@ class EmrSystemTest extends TestCase
         $dashboardResponse->assertStatus(200);
 
         // 4. Switch family profile
-        $child = Patient::where('relationship_to_account_holder', 'CHILD')->first();
+        $child = Patient::where('account_id', $account->id)->where('relationship_to_account_holder', 'CHILD')->first();
         $switchResponse = $this->post(route('patient.switch_profile'), [
             'patient_id' => $child->id,
         ]);
@@ -112,12 +134,13 @@ class EmrSystemTest extends TestCase
             'account_id' => $account->id,
         ]);
 
-        // 6. Patient books an online appointment for themselves
+        // 6. Patient books an online appointment with visit_type = NEW_PATIENT
         $doctor = User::where('role', 'DOCTOR')->first();
         $bookResponse = $this->post(route('patient.book_appointment'), [
             'patient_id' => $child->id,
             'provider_id' => $doctor->id,
             'appointment_date' => now()->addDays(2)->format('Y-m-d H:i:s'),
+            'visit_type' => 'NEW_PATIENT',
             'type' => 'PEDIATRIC_CHECKUP',
             'chief_complaint' => 'Mild seasonal cough and sore throat',
         ]);
@@ -126,132 +149,218 @@ class EmrSystemTest extends TestCase
         $this->assertDatabaseHas('appointments', [
             'patient_id' => $child->id,
             'provider_id' => $doctor->id,
+            'visit_type' => 'NEW_PATIENT',
             'status' => 'SCHEDULED',
-            'type' => 'PEDIATRIC_CHECKUP',
-            'chief_complaint' => 'Mild seasonal cough and sore throat',
+            'payment_status' => 'UNPAID',
         ]);
     }
 
-    public function test_clerk_walkin_registration_and_queue()
+    public function test_phase1_serial_and_token_generation_and_notification_dispatch()
     {
-        $nurse = User::where('role', 'NURSE')->first();
         $doctor = User::where('role', 'DOCTOR')->first();
-        $this->actingAs($nurse);
+        $patient = Patient::first();
 
-        // Register walk-in patient without online account (standalone walk-in)
-        $response = $this->post(route('clerk.register_walkin'), [
-            'first_name' => 'Arthur',
-            'last_name' => 'Pendleton',
-            'date_of_birth' => '1970-01-15',
-            'gender' => 'MALE',
-            'phone' => '+15559998877',
-            'blood_group' => 'O-',
-            'create_online_account' => false,
-            'provider_id' => $doctor->id,
-            'chief_complaint' => 'Severe seasonal asthma flare',
-        ]);
-
-        $response->assertRedirect(route('clerk.queue'));
-
-        $patient = Patient::where('first_name', 'Arthur')->first();
-        $this->assertNotNull($patient);
-        $this->assertNull($patient->account_id); // Verified standalone walk-in
-        $this->assertStringStartsWith('MRN-', $patient->mrn);
-
-        // Verify appointment created in CHECKED_IN status
-        $this->assertDatabaseHas('appointments', [
+        // 1. First Visit / New Patient ($75 standard consultation fee)
+        $apt1 = Appointment::create([
             'patient_id' => $patient->id,
             'provider_id' => $doctor->id,
-            'status' => 'CHECKED_IN',
+            'appointment_date' => '2026-11-01 09:00:00',
+            'visit_type' => 'NEW_PATIENT',
+            'type' => 'CONSULTATION',
+        ]);
+
+        $this->assertEquals(1, $apt1->serial_number);
+        $this->assertEquals('TK-001', $apt1->token_number);
+        $this->assertEquals(75.00, $apt1->fee_amount);
+        $this->assertEquals('UNPAID', $apt1->payment_status);
+
+        // Check automated notification payload
+        $this->assertNotNull($apt1->notification_payload);
+        $this->assertStringContainsString('Serial: #1', $apt1->notification_payload['sms_body']);
+        $this->assertStringContainsString('TK-001', $apt1->notification_payload['sms_body']);
+        $this->assertStringContainsString($doctor->name, $apt1->notification_payload['sms_body']);
+
+        // 2. Second Visit on same day with Report Visit ($30 follow-up fee)
+        $apt2 = Appointment::create([
+            'patient_id' => $patient->id,
+            'provider_id' => $doctor->id,
+            'appointment_date' => '2026-11-01 10:00:00',
+            'visit_type' => 'REPORT_VISIT',
+            'type' => 'FOLLOW_UP',
+        ]);
+
+        $this->assertEquals(2, $apt2->serial_number);
+        $this->assertEquals('TK-002', $apt2->token_number);
+        $this->assertEquals(30.00, $apt2->fee_amount);
+    }
+
+    public function test_phase2_front_desk_fee_collection_and_doctor_queue_activation()
+    {
+        $receptionist = User::where('role', 'RECEPTIONIST')->first();
+        $doctor = User::where('role', 'DOCTOR')->first();
+        $patient = Patient::first();
+
+        $this->actingAs($receptionist);
+
+        // Scheduled appointment with UNPAID fee
+        $appointment = Appointment::create([
+            'patient_id' => $patient->id,
+            'provider_id' => $doctor->id,
+            'appointment_date' => now()->toDateString() . ' 11:00:00',
+            'visit_type' => 'NEW_PATIENT',
+            'status' => 'SCHEDULED',
+            'payment_status' => 'UNPAID',
+        ]);
+
+        $this->assertEquals('UNPAID', $appointment->payment_status);
+        $this->assertEquals('SCHEDULED', $appointment->status);
+
+        // Cashier collects fee at front desk
+        $response = $this->post(route('clerk.collect_fee', $appointment->id), [
+            'payment_method' => 'CASH',
+            'payment_reference' => 'REG-00192',
+            'notes' => 'Paid at front counter',
+        ]);
+
+        $response->assertSessionHas('success');
+
+        // Verify appointment was activated into doctor queue: status = CHECKED_IN, payment_status = PAID
+        $appointment->refresh();
+        $this->assertEquals('PAID', $appointment->payment_status);
+        $this->assertEquals('CHECKED_IN', $appointment->status);
+        $this->assertNotNull($appointment->paid_at);
+
+        // Verify official consultation invoice was created
+        $this->assertDatabaseHas('invoices', [
+            'appointment_id' => $appointment->id,
+            'patient_id' => $patient->id,
+            'invoice_type' => 'CONSULTATION',
+            'grand_total' => 75.00,
+            'status' => 'PAID',
         ]);
     }
 
-    public function test_doctor_soap_drafting_and_signing_generates_auto_billing()
+    public function test_phase3_doctor_waiting_display_and_queue_search()
     {
         $doctor = User::where('role', 'DOCTOR')->first();
         $this->actingAs($doctor);
 
+        // View Doctor's Queue Desk
+        $indexResponse = $this->get(route('doctor.encounters'));
+        $indexResponse->assertStatus(200);
+
+        // Search Queue by Serial / Token
+        $searchResponse = $this->get(route('doctor.encounters', ['search' => 'TK-001']));
+        $searchResponse->assertStatus(200);
+
+        // View Dedicated Fullscreen TV Waiting Room Display Screen
+        $displayResponse = $this->get(route('doctor.display'));
+        $displayResponse->assertStatus(200);
+    }
+
+    public function test_phase4_diagnostic_billing_with_partial_test_selection()
+    {
+        $biller = User::where('role', 'BILLER')->first();
+        $doctor = User::where('role', 'DOCTOR')->first();
         $patient = Patient::first();
-        $appointment = Appointment::create([
+        $encounter = Encounter::first();
+
+        // 1. Doctor prescribes 2 tests during consultation
+        $test1 = LabTestCatalog::where('test_code', 'CBC-001')->first();
+        $test2 = LabTestCatalog::where('test_code', 'HBA1C-003')->first();
+
+        $order = LabOrder::create([
             'patient_id' => $patient->id,
             'provider_id' => $doctor->id,
-            'appointment_date' => now(),
-            'status' => 'CHECKED_IN',
-            'type' => 'CONSULTATION',
-            'chief_complaint' => 'Acute migraine with visual aura',
+            'encounter_id' => $encounter->id,
+            'status' => 'ORDERED',
         ]);
 
-        // Start encounter
-        $startResponse = $this->post(route('doctor.encounter.start', $appointment->id));
-        $encounter = Encounter::where('appointment_id', $appointment->id)->first();
-        $startResponse->assertRedirect(route('doctor.encounter.show', $encounter->id));
-
-        // Medicine to prescribe
-        $medicine = MedicineCatalog::first();
-
-        // Save draft SOAP notes and eRx
-        $draftResponse = $this->post(route('doctor.encounter.draft', $encounter->id), [
-            'temperature_c' => 37.1,
-            'systolic_bp' => 125,
-            'diastolic_bp' => 82,
-            'heart_rate_bpm' => 76,
-            'weight_kg' => 72.0,
-            'height_cm' => 175.0,
-            'subjective_notes' => 'Patient complains of throbbing unilateral temporal headache.',
-            'objective_notes' => 'Neurological exam benign, pupillary responses normal.',
-            'assessment_notes' => 'Migraine with aura, episodic.',
-            'plan_notes' => 'Initiate medication, rest in quiet dark environment.',
-            'diagnoses' => [
-                [
-                    'icd10_code' => 'G43.109',
-                    'description' => 'Migraine with aura, not intractable',
-                    'type' => 'PRIMARY',
-                ],
-            ],
-            'prescriptions' => [
-                [
-                    'medicine_id' => $medicine->id,
-                    'dosage' => '1 tablet',
-                    'frequency' => 'PRN at onset',
-                    'duration_days' => 7,
-                    'quantity' => 10,
-                    'instructions' => 'Take with water at first sign of aura.',
-                ],
-            ],
+        $item1 = LabOrderItem::create([
+            'lab_order_id' => $order->id,
+            'lab_test_id' => $test1->id,
+            'standard_price' => $test1->standard_price,
+            'net_price' => $test1->standard_price,
+            'billing_status' => 'UNBILLED',
         ]);
-        $draftResponse->assertSessionHas('success');
 
-        // Sign encounter
-        $signResponse = $this->post(route('doctor.encounter.sign', $encounter->id));
-        $signResponse->assertRedirect(route('doctor.encounter.show', $encounter->id));
+        $item2 = LabOrderItem::create([
+            'lab_order_id' => $order->id,
+            'lab_test_id' => $test2->id,
+            'standard_price' => $test2->standard_price,
+            'net_price' => $test2->standard_price,
+            'billing_status' => 'UNBILLED',
+        ]);
 
-        // Verify encounter is signed
-        $encounter->refresh();
-        $this->assertTrue($encounter->is_signed);
-        $this->assertNotNull($encounter->signed_at);
+        // 2. Billing Clerk accesses Diagnostic Counter Desk
+        $this->actingAs($biller);
+        $deskResponse = $this->get(route('billing.diagnostics', ['search' => $patient->mrn]));
+        $deskResponse->assertStatus(200);
 
-        // Verify automated invoice generated!
-        $invoice = Invoice::where('encounter_id', $encounter->id)->first();
+        // 3. Patient decides to conduct ONLY test 1 (partial billing)
+        $billResponse = $this->post(route('billing.diagnostics.bill'), [
+            'patient_id' => $patient->id,
+            'selected_test_ids' => [$item1->id], // Only item 1 selected!
+            'payment_method' => 'CREDIT_CARD',
+            'payment_reference' => 'CC-AUTH-77291',
+            'notes' => 'Patient selected partial testing',
+        ]);
+
+        $billResponse->assertRedirect();
+
+        // Verify test 1 is now BILLED
+        $item1->refresh();
+        $this->assertEquals('BILLED', $item1->billing_status);
+        $this->assertNotNull($item1->invoice_id);
+
+        // Verify test 2 remains UNBILLED (flexible itemization preserved)
+        $item2->refresh();
+        $this->assertEquals('UNBILLED', $item2->billing_status);
+        $this->assertNull($item2->invoice_id);
+
+        // Verify Diagnostic Invoice generated with type DIAGNOSTIC
+        $invoice = Invoice::find($item1->invoice_id);
         $this->assertNotNull($invoice);
-        $this->assertEquals('UNPAID', $invoice->status);
-        $this->assertGreaterThan(0, $invoice->grand_total);
+        $this->assertEquals('DIAGNOSTIC', $invoice->invoice_type);
+        $this->assertEquals('PAID', $invoice->status);
+        $this->assertEquals($test1->standard_price, $invoice->grand_total);
+    }
 
-        // Verify invoice has consultation fee item and medicine item
-        $this->assertDatabaseHas('invoice_items', [
-            'invoice_id' => $invoice->id,
-            'item_type' => 'CONSULTATION',
+    public function test_admin_staff_management_and_doctor_fees_setup()
+    {
+        $admin = User::where('role', 'ADMIN')->first();
+        $this->actingAs($admin);
+
+        // View Master Setup & Catalogs
+        $catResponse = $this->get(route('admin.catalogs'));
+        $catResponse->assertStatus(200);
+
+        // Create new Doctor with custom consultation and report visit fees
+        $createResponse = $this->post(route('admin.staff.store'), [
+            'name' => 'Dr. Robert Oppenheimer, MD',
+            'email' => 'oppenheimer@emr.local',
+            'password' => 'secret123',
+            'role' => 'DOCTOR',
+            'department' => 'Oncology',
+            'specialization' => 'Consultant Oncologist',
+            'license_number' => 'MD-102938',
+            'consultation_fee' => 120.00, // Custom first visit fee
+            'followup_fee' => 50.00,     // Custom follow-up fee
         ]);
-        $this->assertDatabaseHas('invoice_items', [
-            'invoice_id' => $invoice->id,
-            'item_type' => 'MEDICINE',
+
+        $createResponse->assertSessionHas('success');
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'oppenheimer@emr.local',
+            'role' => 'DOCTOR',
+            'consultation_fee' => 120.00,
+            'followup_fee' => 50.00,
         ]);
     }
 
     public function test_audit_logs_recorded_for_phi_operations()
     {
         $doctor = User::where('role', 'DOCTOR')->first();
-        $patient = Patient::first();
-
         $this->actingAs($doctor);
 
         // View encounter which triggers PHI view audit

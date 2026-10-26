@@ -385,24 +385,66 @@
           </button>
         </div>
 
-        <div v-for="apt in appointments" :key="apt.id" class="bg-white rounded-2xl p-5 shadow-xs border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-slate-900 text-base">{{ apt.type }}</span>
-              <span :class="[
-                apt.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800',
-                'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase'
-              ]">
-                {{ apt.status }}
-              </span>
+        <div v-for="apt in appointments" :key="apt.id" class="bg-white rounded-2xl p-5 shadow-xs border border-slate-200 space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+              <!-- Prominent Daily Serial Badge -->
+              <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white font-mono font-black flex items-center justify-center text-lg shrink-0 shadow-xs">
+                #{{ apt.serial_number || '-' }}
+              </div>
+
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-bold text-slate-900 text-base">{{ apt.type }}</span>
+                  <span class="px-2 py-0.5 rounded font-mono text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                    {{ apt.token_number || ('TK-' + String(apt.serial_number).padStart(3, '0')) }}
+                  </span>
+                  <span
+                    :class="[
+                      'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
+                      apt.visit_type === 'REPORT_VISIT'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    ]"
+                  >
+                    {{ apt.visit_type === 'REPORT_VISIT' ? 'Report Visit / Follow-up' : 'First / New Patient' }}
+                  </span>
+                  <span :class="[
+                    apt.payment_status === 'PAID' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800',
+                    'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase'
+                  ]">
+                    {{ apt.payment_status }} (${{ Number(apt.fee_amount || 0).toFixed(2) }})
+                  </span>
+                  <span :class="[
+                    apt.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800',
+                    'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase'
+                  ]">
+                    {{ apt.status }}
+                  </span>
+                </div>
+                <p class="text-xs text-slate-600 mt-1">Provider: <strong>{{ apt.provider?.name }}</strong> ({{ apt.provider?.specialization }})</p>
+                <p v-if="apt.chief_complaint" class="text-xs text-slate-500 italic mt-0.5">"{{ apt.chief_complaint }}"</p>
+              </div>
             </div>
-            <p class="text-xs text-slate-600 mt-1">Provider: <strong>{{ apt.provider?.name }}</strong> ({{ apt.provider?.specialization }})</p>
-            <p v-if="apt.chief_complaint" class="text-xs text-slate-500 italic mt-0.5">"{{ apt.chief_complaint }}"</p>
+
+            <div class="text-right shrink-0">
+              <span class="text-xs font-semibold text-slate-400 block">Appointment Schedule</span>
+              <span class="font-bold text-slate-900 text-sm">{{ formatDateTime(apt.appointment_date) }}</span>
+            </div>
           </div>
 
-          <div class="text-right shrink-0">
-            <span class="text-xs font-semibold text-slate-400 block">Appointment Schedule</span>
-            <span class="font-bold text-slate-900 text-sm">{{ formatDateTime(apt.appointment_date) }}</span>
+          <!-- Phase 1: Automated SMS & Email Notification Dispatch Preview -->
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
+            <div class="flex items-center gap-2 text-slate-700 font-semibold text-[11px]">
+              <svg class="w-3.5 h-3.5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span>Automated SMS & Email Notification Sent</span>
+              <span class="text-[10px] text-slate-400">&bull; Daily Serial Dispatched</span>
+            </div>
+            <p class="text-slate-500 font-mono text-[11px]">
+              {{ apt.notification_payload?.sms_body || `Hi ${activePatient?.first_name}, your appointment with ${apt.provider?.name} is confirmed for ${formatDate(apt.appointment_date)}. Serial: #${apt.serial_number} (${apt.token_number}). Please arrive 15m early.` }}
+            </p>
           </div>
         </div>
       </div>
@@ -433,12 +475,44 @@
           <!-- Doctor Selector -->
           <div>
             <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Select Physician / Specialist *</label>
-            <select v-model="appointmentForm.provider_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none">
+            <select v-model="appointmentForm.provider_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white">
               <option value="" disabled>Choose physician...</option>
               <option v-for="doc in doctors" :key="doc.id" :value="doc.id">
-                {{ doc.name }} ({{ doc.specialization }}) - Consultation Fee: ${{ doc.consultation_fee }}
+                {{ doc.name }} ({{ doc.specialization }}) &bull; First Visit: ${{ Number(doc.consultation_fee || 75).toFixed(0) }} | Report: ${{ Number(doc.followup_fee || 30).toFixed(0) }}
               </option>
             </select>
+          </div>
+
+          <!-- Phase 1: Visit Categorization (New Patient vs Report Visit) -->
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <span class="block font-bold text-slate-800 uppercase tracking-wide text-[10px] mb-2">Consultation Visit Type *</span>
+            <div class="grid grid-cols-2 gap-2">
+              <label
+                :class="[
+                  appointmentForm.visit_type === 'NEW_PATIENT'
+                    ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold ring-2 ring-emerald-400/20'
+                    : 'bg-white border-slate-200 text-slate-700',
+                  'p-2.5 rounded-xl border cursor-pointer text-center transition'
+                ]"
+              >
+                <input type="radio" v-model="appointmentForm.visit_type" value="NEW_PATIENT" class="sr-only" />
+                <div class="text-xs">First / New Visit</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">Standard Consultation Fee</div>
+              </label>
+
+              <label
+                :class="[
+                  appointmentForm.visit_type === 'REPORT_VISIT'
+                    ? 'bg-amber-50 border-amber-500 text-amber-900 font-bold ring-2 ring-amber-400/20'
+                    : 'bg-white border-slate-200 text-slate-700',
+                  'p-2.5 rounded-xl border cursor-pointer text-center transition'
+                ]"
+              >
+                <input type="radio" v-model="appointmentForm.visit_type" value="REPORT_VISIT" class="sr-only" />
+                <div class="text-xs">Report / Follow-up</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">Follow-up Review Fee</div>
+              </label>
+            </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -447,7 +521,7 @@
               <input v-model="appointmentForm.appointment_date" required type="datetime-local" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" />
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Visit Type *</label>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Encounter Type *</label>
               <select v-model="appointmentForm.type" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none">
                 <option value="CONSULTATION">General Consultation</option>
                 <option value="ROUTINE_CHECKUP">Routine Wellness Check</option>
@@ -593,6 +667,7 @@ const appointmentForm = useForm({
   patient_id: '',
   provider_id: '',
   appointment_date: '',
+  visit_type: 'NEW_PATIENT',
   type: 'CONSULTATION',
   chief_complaint: '',
 });

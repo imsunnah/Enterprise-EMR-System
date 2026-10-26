@@ -81,9 +81,9 @@
                 Staff Operations
               </div>
 
-              <!-- Clerk / Reception -->
+              <!-- Receptionist / Front Desk Queue -->
               <Link
-                v-if="['ADMIN', 'DOCTOR', 'NURSE', 'BILLER'].includes(currentRole)"
+                v-if="['ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'].includes(currentRole)"
                 href="/clerk/queue"
                 :class="[
                   $page.url.startsWith('/clerk')
@@ -103,7 +103,7 @@
                 v-if="['ADMIN', 'DOCTOR', 'NURSE'].includes(currentRole)"
                 href="/doctor/encounters"
                 :class="[
-                  $page.url.startsWith('/doctor')
+                  $page.url.startsWith('/doctor/encounters')
                     ? 'bg-teal-600/20 text-teal-300 border-l-2 border-teal-500 font-medium'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50',
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition'
@@ -115,12 +115,29 @@
                 <span>Clinical SOAP Charting</span>
               </Link>
 
-              <!-- Billing Desk (RCM) -->
+              <!-- Waiting Room Live Screen (Display Screen) -->
+              <Link
+                v-if="['ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'].includes(currentRole)"
+                href="/doctor/display"
+                :class="[
+                  $page.url.startsWith('/doctor/display')
+                    ? 'bg-sky-600/20 text-sky-300 border-l-2 border-sky-500 font-medium'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50',
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition'
+                ]"
+              >
+                <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span>Live TV Waiting Display</span>
+              </Link>
+
+              <!-- Billing Desk (Invoices & RCM) -->
               <Link
                 v-if="['ADMIN', 'BILLER'].includes(currentRole)"
                 href="/billing"
                 :class="[
-                  $page.url.startsWith('/billing')
+                  $page.url === '/billing'
                     ? 'bg-teal-600/20 text-teal-300 border-l-2 border-teal-500 font-medium'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50',
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition'
@@ -129,10 +146,27 @@
                 <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>Revenue & Billing Desk</span>
+                <span>Invoices & Transactions</span>
               </Link>
 
-              <!-- Admin Catalogs & Audits -->
+              <!-- Diagnostic Billing Counter (Phase 4 Itemization) -->
+              <Link
+                v-if="['ADMIN', 'BILLER'].includes(currentRole)"
+                href="/billing/diagnostics"
+                :class="[
+                  $page.url.startsWith('/billing/diagnostics')
+                    ? 'bg-teal-600/20 text-teal-300 border-l-2 border-teal-500 font-medium'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50',
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition'
+                ]"
+              >
+                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+                <span>Diagnostic Billing Desk</span>
+              </Link>
+
+              <!-- Admin Catalogs & Staff Management -->
               <Link
                 v-if="currentRole === 'ADMIN'"
                 href="/admin/catalogs"
@@ -144,9 +178,10 @@
                 ]"
               >
                 <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span>Catalogs & Audit Trail</span>
+                <span>Staff, Fees & Catalogs</span>
               </Link>
             </template>
 
@@ -246,7 +281,8 @@ const page = usePage();
 
 const roles = [
   { name: 'Doctor', role: 'DOCTOR', dot: 'bg-emerald-400' },
-  { name: 'Clerk / Reception', role: 'NURSE', dot: 'bg-cyan-400' },
+  { name: 'Receptionist', role: 'RECEPTIONIST', dot: 'bg-teal-400' },
+  { name: 'Staff Nurse', role: 'NURSE', dot: 'bg-cyan-400' },
   { name: 'Billing Clerk', role: 'BILLER', dot: 'bg-amber-400' },
   { name: 'Administrator', role: 'ADMIN', dot: 'bg-purple-400' },
 ];
@@ -264,6 +300,7 @@ const currentRoleLabel = computed(() => {
   if (isPatientPortal.value) return 'Patient Portal';
   switch (currentRole.value) {
     case 'DOCTOR': return 'Doctor (MD)';
+    case 'RECEPTIONIST': return 'Front Desk Receptionist';
     case 'NURSE': return 'Staff Nurse';
     case 'BILLER': return 'Billing Clerk';
     case 'ADMIN': return 'Administrator';
@@ -289,6 +326,7 @@ const currentUserSubtext = computed(() => {
 const roleBadgeClass = computed(() => {
   switch (currentRole.value) {
     case 'DOCTOR': return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+    case 'RECEPTIONIST': return 'bg-teal-500/20 text-teal-300 border border-teal-500/40';
     case 'NURSE': return 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
     case 'BILLER': return 'bg-amber-500/20 text-amber-300 border border-amber-500/40';
     case 'ADMIN': return 'bg-purple-500/20 text-purple-300 border border-purple-500/40';

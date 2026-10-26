@@ -37,10 +37,16 @@
           <div class="text-left sm:text-right">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block">Itemized Billing Statement</span>
             <span class="text-2xl font-black font-mono text-slate-900 block mt-0.5">{{ invoice.invoice_number }}</span>
-            <div class="mt-2">
+            <div class="mt-2 flex items-center gap-1.5 justify-start sm:justify-end flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {{ invoice.invoice_type || 'STANDARD' }}
+              </span>
+              <span v-if="invoice.appointment?.token_number" class="px-2 py-0.5 rounded font-mono text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                Token: {{ invoice.appointment.token_number }} (#{{ invoice.appointment.serial_number }})
+              </span>
               <span :class="[
                 invoice.status === 'PAID' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800',
-                'px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider'
+                'px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider'
               ]">
                 {{ invoice.status }}
               </span>

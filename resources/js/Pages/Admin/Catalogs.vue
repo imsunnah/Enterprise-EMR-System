@@ -5,14 +5,21 @@
       <div class="bg-white rounded-2xl p-6 shadow-xs border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800">Administrator Console</span>
-            <span class="text-xs text-slate-500 font-medium">Enterprise Master Catalogs & PHI Governance</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800">Administrator Master Setup</span>
+            <span class="text-xs text-slate-500 font-medium">RBAC Matrix, Fee Governance & Catalogs</span>
           </div>
-          <h2 class="text-2xl font-extrabold text-slate-900 mt-1">System Setup & Audit Trails</h2>
-          <p class="text-sm text-slate-500">Configure pharmacy medicines, laboratory test pricing, and inspect immutable audit logs.</p>
+          <h2 class="text-2xl font-extrabold text-slate-900 mt-1">Staff Management & System Setup</h2>
+          <p class="text-sm text-slate-500">Configure doctor consultation fees (New vs Report Visit), manage staff accounts, set catalog rates, and inspect immutable audit logs.</p>
         </div>
 
         <div class="flex items-center gap-2 self-start md:self-auto">
+          <button
+            v-if="activeTab === 'users'"
+            @click="showAddStaffModal = true"
+            class="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition flex items-center gap-1.5"
+          >
+            + Create Staff Account
+          </button>
           <button
             v-if="activeTab === 'medicines'"
             @click="showAddMedModal = true"
@@ -40,7 +47,7 @@
             activeTab === t.id
               ? 'bg-slate-900 text-white font-semibold shadow-xs'
               : 'text-slate-600 hover:bg-slate-200/60',
-            'px-4 py-2 rounded-xl text-xs transition flex items-center gap-2'
+            'px-4 py-2 rounded-xl text-xs transition flex items-center gap-2 shrink-0'
           ]"
         >
           <span>{{ t.label }}</span>
@@ -51,7 +58,82 @@
         </button>
       </div>
 
-      <!-- TAB 1: MEDICINE CATALOG -->
+      <!-- TAB 1: STAFF ROSTER & DOCTOR FEES (RBAC & System Setup) -->
+      <div v-if="activeTab === 'users'" class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm">Staff Directory & Doctor Consultation Fees</h3>
+            <p class="text-xs text-slate-400">Configure New Patient Fee vs Report Visit Fee per physician</p>
+          </div>
+          <span class="text-xs text-slate-400">{{ users.length }} staff users registered</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-4">Staff Member</th>
+                <th class="py-3 px-4">Role</th>
+                <th class="py-3 px-4">Department & Specialization</th>
+                <th class="py-3 px-4">New Patient Visit Fee</th>
+                <th class="py-3 px-4">Report Visit / Follow-up Fee</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700">
+              <tr v-for="u in users" :key="u.id" class="hover:bg-slate-50/70 transition">
+                <td class="py-3.5 px-4">
+                  <div class="font-bold text-slate-900 text-sm">{{ u.name }}</div>
+                  <div class="text-slate-400 text-[11px]">{{ u.email }}</div>
+                </td>
+                <td class="py-3.5 px-4">
+                  <span :class="[
+                    u.role === 'DOCTOR' ? 'bg-emerald-100 text-emerald-800' :
+                    u.role === 'RECEPTIONIST' ? 'bg-teal-100 text-teal-800' :
+                    u.role === 'BILLER' ? 'bg-amber-100 text-amber-800' :
+                    u.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-700',
+                    'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider'
+                  ]">
+                    {{ u.role }}
+                  </span>
+                </td>
+                <td class="py-3.5 px-4">
+                  <div class="font-semibold text-slate-800">{{ u.department || 'General' }}</div>
+                  <div class="text-slate-400 text-[11px]">{{ u.specialization || 'Clinical Staff' }}</div>
+                </td>
+                <td class="py-3.5 px-4 font-mono font-bold">
+                  <span v-if="u.role === 'DOCTOR'" class="text-emerald-700">
+                    ${{ Number(u.consultation_fee || 75).toFixed(2) }}
+                  </span>
+                  <span v-else class="text-slate-400">—</span>
+                </td>
+                <td class="py-3.5 px-4 font-mono font-bold">
+                  <span v-if="u.role === 'DOCTOR'" class="text-amber-700">
+                    ${{ Number(u.followup_fee || 30).toFixed(2) }}
+                  </span>
+                  <span v-else class="text-slate-400">—</span>
+                </td>
+                <td class="py-3.5 px-4">
+                  <span :class="u.is_active ? 'text-emerald-600 font-bold' : 'text-slate-400'">
+                    {{ u.is_active ? 'Active' : 'Inactive' }}
+                  </span>
+                </td>
+                <td class="py-3.5 px-4 text-right">
+                  <button
+                    @click="openEditStaffModal(u)"
+                    class="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold text-xs transition"
+                  >
+                    Configure Fees & Role
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 2: MEDICINE CATALOG -->
       <div v-if="activeTab === 'medicines'" class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
         <div class="p-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="font-bold text-slate-900 text-sm">Medicine Setup & Inventory Rates</h3>
@@ -107,7 +189,7 @@
         </div>
       </div>
 
-      <!-- TAB 2: LAB TEST CATALOG -->
+      <!-- TAB 3: LAB TEST CATALOG -->
       <div v-if="activeTab === 'lab_tests'" class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
         <div class="p-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="font-bold text-slate-900 text-sm">Diagnostic Test Catalog & Turnaround Engine</h3>
@@ -159,7 +241,7 @@
         </div>
       </div>
 
-      <!-- TAB 3: IMMUTABLE AUDIT LOGS -->
+      <!-- TAB 4: IMMUTABLE AUDIT LOGS -->
       <div v-if="activeTab === 'audit_logs'" class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
         <div class="p-4 border-b border-slate-100 flex items-center justify-between">
           <div>
@@ -195,6 +277,7 @@
                 <td class="py-3 px-4">
                   <span :class="[
                     log.user_role === 'DOCTOR' ? 'text-emerald-700 bg-emerald-50' :
+                    log.user_role === 'RECEPTIONIST' ? 'text-teal-700 bg-teal-50' :
                     log.user_role === 'ADMIN' ? 'text-purple-700 bg-purple-50' :
                     log.user_role === 'BILLER' ? 'text-amber-700 bg-amber-50' : 'text-slate-700 bg-slate-100',
                     'px-2 py-0.5 rounded text-[10px] font-bold'
@@ -219,34 +302,143 @@
           </table>
         </div>
       </div>
+    </div>
 
-      <!-- TAB 4: STAFF DIRECTORY -->
-      <div v-if="activeTab === 'users'" class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="font-bold text-slate-900 text-sm">Authorized Staff & Clinical Roles</h3>
-          <span class="text-xs text-slate-400">{{ users.length }} staff users</span>
+    <!-- Modal: Create Staff Account -->
+    <div v-if="showAddStaffModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-scaleIn">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h3 class="text-lg font-bold text-slate-900">Create Staff User Account</h3>
+          <button @click="showAddStaffModal = false" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
         </div>
 
-        <div class="divide-y divide-slate-100">
-          <div v-for="u in users" :key="u.id" class="p-4 flex items-center justify-between hover:bg-slate-50 text-xs">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-slate-900 text-white font-bold flex items-center justify-center text-sm">
-                {{ u.name[0] }}
-              </div>
-              <div>
-                <span class="font-bold text-slate-900 text-sm block">{{ u.name }}</span>
-                <span class="text-slate-400">{{ u.email }} • {{ u.specialization || 'General Staff' }}</span>
-              </div>
+        <form @submit.prevent="submitStaff" class="mt-4 space-y-4 text-xs">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Full Name *</label>
+              <input v-model="staffForm.name" required placeholder="Dr. Sarah Connor" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
             </div>
-
-            <div class="flex items-center gap-3">
-              <span class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
-                {{ u.role }}
-              </span>
-              <span class="text-emerald-600 font-semibold text-xs">Active</span>
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Email Address *</label>
+              <input v-model="staffForm.email" required type="email" placeholder="sarah@emr.local" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
             </div>
           </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Password *</label>
+              <input v-model="staffForm.password" required type="password" placeholder="Password123!" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">System Role *</label>
+              <select v-model="staffForm.role" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                <option value="DOCTOR">Doctor (Physician)</option>
+                <option value="RECEPTIONIST">Receptionist / Front Desk Cashier</option>
+                <option value="BILLER">Billing Clerk</option>
+                <option value="NURSE">Staff Nurse</option>
+                <option value="ADMIN">Administrator</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Department</label>
+              <input v-model="staffForm.department" placeholder="Internal Medicine, Triage..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Specialization</label>
+              <input v-model="staffForm.specialization" placeholder="Cardiologist, Front Desk Officer..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+            </div>
+          </div>
+
+          <!-- Doctor Fees Configuration (Enabled if role === DOCTOR) -->
+          <div v-if="staffForm.role === 'DOCTOR'" class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-2">
+            <span class="block font-bold text-purple-900 uppercase tracking-wide text-[10px]">Doctor Consultation Fee Setup</span>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 text-[10px] mb-1">New Patient Visit Fee ($) *</label>
+                <input v-model.number="staffForm.consultation_fee" required type="number" step="0.01" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white" />
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 text-[10px] mb-1">Report Visit / Follow-up Fee ($) *</label>
+                <input v-model.number="staffForm.followup_fee" required type="number" step="0.01" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white" />
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-4 flex justify-end gap-2 border-t border-slate-100">
+            <button @click="showAddStaffModal = false" type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs">Cancel</button>
+            <button :disabled="staffForm.processing" type="submit" class="px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20">
+              Create Staff Account
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Edit Staff Member & Doctor Fees -->
+    <div v-if="editingUser" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-scaleIn">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div>
+            <h3 class="text-lg font-bold text-slate-900">Configure Staff & Doctor Fees</h3>
+            <p class="text-xs text-slate-500">{{ editingUser.name }} ({{ editingUser.email }})</p>
+          </div>
+          <button @click="editingUser = null" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
         </div>
+
+        <form @submit.prevent="submitEditStaff" class="mt-4 space-y-4 text-xs">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Full Name *</label>
+              <input v-model="editStaffForm.name" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">System Role *</label>
+              <select v-model="editStaffForm.role" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                <option value="DOCTOR">Doctor</option>
+                <option value="RECEPTIONIST">Receptionist</option>
+                <option value="BILLER">Billing Clerk</option>
+                <option value="NURSE">Staff Nurse</option>
+                <option value="ADMIN">Administrator</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Department</label>
+              <input v-model="editStaffForm.department" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Specialization</label>
+              <input v-model="editStaffForm.specialization" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+            </div>
+          </div>
+
+          <!-- Doctor Fees Configuration -->
+          <div v-if="editStaffForm.role === 'DOCTOR'" class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-2">
+            <span class="block font-bold text-purple-900 uppercase tracking-wide text-[10px]">Consultation Fee Settings</span>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 text-[10px] mb-1">New Patient Visit Fee ($) *</label>
+                <input v-model.number="editStaffForm.consultation_fee" required type="number" step="0.01" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white" />
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 text-[10px] mb-1">Report Visit / Follow-up Fee ($) *</label>
+                <input v-model.number="editStaffForm.followup_fee" required type="number" step="0.01" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white" />
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-4 flex justify-end gap-2 border-t border-slate-100">
+            <button @click="editingUser = null" type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs">Cancel</button>
+            <button :disabled="editStaffForm.processing" type="submit" class="px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20">
+              Update Staff & Fees
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -382,16 +574,39 @@ const props = defineProps({
   users: Array,
 });
 
-const activeTab = ref('medicines');
+const activeTab = ref('users');
+const showAddStaffModal = ref(false);
 const showAddMedModal = ref(false);
 const showAddLabModal = ref(false);
+const editingUser = ref(null);
 
 const tabs = computed(() => [
+  { id: 'users', label: 'Staff Roster & Fee Setup', count: props.users?.length || 0 },
   { id: 'medicines', label: 'Medicine Catalog', count: props.medicines?.length || 0 },
   { id: 'lab_tests', label: 'Lab Test Catalog', count: props.labTests?.length || 0 },
   { id: 'audit_logs', label: 'Audit Compliance Logs', count: props.auditLogs?.length || 0 },
-  { id: 'users', label: 'Staff Roster & Roles', count: props.users?.length || 0 },
 ]);
+
+const staffForm = useForm({
+  name: '',
+  email: '',
+  password: 'Password123!',
+  role: 'DOCTOR',
+  department: 'Cardiology',
+  specialization: 'Attending Physician',
+  consultation_fee: 75.00,
+  followup_fee: 30.00,
+});
+
+const editStaffForm = useForm({
+  name: '',
+  role: '',
+  department: '',
+  specialization: '',
+  consultation_fee: 75.00,
+  followup_fee: 30.00,
+  is_active: true,
+});
 
 const medForm = useForm({
   brand_name: '',
@@ -412,6 +627,35 @@ const labForm = useForm({
   specimen_type: 'Blood',
   turnaround_hours: 12,
 });
+
+const openEditStaffModal = (user) => {
+  editingUser.value = user;
+  editStaffForm.name = user.name;
+  editStaffForm.role = user.role;
+  editStaffForm.department = user.department || '';
+  editStaffForm.specialization = user.specialization || '';
+  editStaffForm.consultation_fee = user.consultation_fee || 75.00;
+  editStaffForm.followup_fee = user.followup_fee || 30.00;
+  editStaffForm.is_active = user.is_active ?? true;
+};
+
+const submitStaff = () => {
+  staffForm.post('/admin/staff', {
+    onSuccess: () => {
+      showAddStaffModal.value = false;
+      staffForm.reset();
+    },
+  });
+};
+
+const submitEditStaff = () => {
+  if (!editingUser.value) return;
+  editStaffForm.post(`/admin/staff/${editingUser.value.id}`, {
+    onSuccess: () => {
+      editingUser.value = null;
+    },
+  });
+};
 
 const submitMedicine = () => {
   medForm.post('/admin/catalogs/medicines', {

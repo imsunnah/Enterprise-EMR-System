@@ -271,6 +271,24 @@ class DatabaseSeeder extends Seeder
             'allergies' => 'None reported',
         ]);
 
+        $patientChild = Patient::create([
+            'account_id' => $account->id,
+            'mrn' => 'MRN-2026-10494',
+            'first_name' => 'Leo',
+            'last_name' => 'Miller',
+            'date_of_birth' => '2016-08-10',
+            'gender' => 'MALE',
+            'blood_group' => 'O+',
+            'phone' => '+15551234567',
+            'email' => 'leo.miller@example.com',
+            'address' => '742 Evergreen Terrace, Springfield',
+            'relationship_to_account_holder' => 'CHILD',
+            'emergency_contact_name' => 'Johnathan Miller',
+            'emergency_contact_phone' => '+15551234567',
+            'insurance_provider' => 'Blue Cross Blue Shield HealthNet',
+            'allergies' => 'Peanuts',
+        ]);
+
         $patientWalkIn = Patient::create([
             'account_id' => null, // Standalone walk-in
             'mrn' => 'MRN-2026-20015',

@@ -67,6 +67,10 @@ class Appointment extends Model
                 }
             }
 
+            if (empty($appointment->payment_status)) {
+                $appointment->payment_status = 'UNPAID';
+            }
+
             // Build automated simulated notification payload
             $patient = Patient::find($appointment->patient_id);
             $doctorName = $provider ? $provider->name : 'Attending Physician';
@@ -75,10 +79,13 @@ class Appointment extends Model
             $mrn = $patient ? $patient->mrn : 'N/A';
             $timeFormatted = Carbon::parse($appointment->appointment_date)->format('M d, Y h:i A');
 
+            $smsText = "Synapse EMR: Appointment confirmed for {$patientName} (ID: {$mrn}) with Dr. {$doctorName} ({$dept}) on {$timeFormatted}. Daily Serial: #{$appointment->serial_number} ({$appointment->token_number}). Visit Type: {$appointment->visit_type}.";
+
             $appointment->notification_payload = [
+                'sms_body' => $smsText,
                 'sms' => [
                     'recipient' => $patient ? $patient->phone : 'N/A',
-                    'message' => "Synapse EMR: Appointment confirmed for {$patientName} (ID: {$mrn}) with Dr. {$doctorName} ({$dept}) on {$timeFormatted}. Daily Serial: #{$appointment->serial_number} ({$appointment->token_number}). Visit Type: {$appointment->visit_type}.",
+                    'message' => $smsText,
                     'dispatched_at' => now()->toISOString(),
                     'status' => 'DELIVERED',
                 ],
