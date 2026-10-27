@@ -335,32 +335,49 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Phone Number *</label>
               <input v-model="walkInForm.phone" required type="text" placeholder="+15550000000" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" />
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Date of Birth *</label>
-              <input v-model="walkInForm.date_of_birth" required type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Date of Birth * (Max Today)</label>
+              <input v-model="walkInForm.date_of_birth" :max="todayDate" required type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" />
             </div>
             <div>
               <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Gender *</label>
-              <select v-model="walkInForm.gender" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none">
+              <select v-model="walkInForm.gender" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white">
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
                 <option value="OTHER">Other</option>
               </select>
             </div>
+            <div>
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Blood Group (Fixed)</label>
+              <select v-model="walkInForm.blood_group" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white">
+                <option value="">Select Blood Group...</option>
+                <option v-for="bg in bloodGroups" :key="bg" :value="bg">{{ bg }}</option>
+              </select>
+            </div>
           </div>
 
-          <!-- Doctor Assignment -->
+          <!-- Doctor Assignment with Department Filter -->
           <div>
-            <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Assign Attending Physician *</label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px]">Assign Attending Physician *</label>
+              <div class="flex items-center gap-1">
+                <span class="text-[10px] text-slate-400 font-bold uppercase">Dept:</span>
+                <select v-model="walkInDept" class="px-2 py-0.5 border border-slate-300 rounded text-[11px] bg-slate-50 focus:bg-white focus:outline-none">
+                  <option v-for="dept in availableDoctorDepartments" :key="dept" :value="dept">
+                    {{ dept === 'ALL' ? 'All Departments' : dept }}
+                  </option>
+                </select>
+              </div>
+            </div>
             <select v-model="walkInForm.provider_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none bg-white">
               <option value="" disabled>Select Doctor...</option>
-              <option v-for="doc in doctors" :key="doc.id" :value="doc.id">
-                {{ doc.name }} ({{ doc.specialization }}) &bull; First Visit: ${{ Number(doc.consultation_fee || 75).toFixed(0) }} | Report: ${{ Number(doc.followup_fee || 30).toFixed(0) }}
+              <option v-for="doc in filteredWalkInDoctors" :key="doc.id" :value="doc.id">
+                {{ doc.name }} &bull; {{ doc.department }} ({{ doc.specialization }}) &bull; First Visit: ${{ Number(doc.consultation_fee || 75).toFixed(0) }} | Report: ${{ Number(doc.followup_fee || 30).toFixed(0) }}
               </option>
             </select>
           </div>
@@ -459,11 +476,21 @@
           </div>
 
           <div>
-            <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px] mb-1">Attending Doctor *</label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block font-semibold text-slate-700 uppercase tracking-wide text-[10px]">Attending Doctor *</label>
+              <div class="flex items-center gap-1">
+                <span class="text-[10px] text-slate-400 font-bold uppercase">Dept:</span>
+                <select v-model="scheduleDept" class="px-2 py-0.5 border border-slate-300 rounded text-[11px] bg-slate-50 focus:bg-white focus:outline-none">
+                  <option v-for="dept in availableDoctorDepartments" :key="dept" :value="dept">
+                    {{ dept === 'ALL' ? 'All Departments' : dept }}
+                  </option>
+                </select>
+              </div>
+            </div>
             <select v-model="scheduleForm.provider_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none">
               <option value="" disabled>Choose physician...</option>
-              <option v-for="doc in doctors" :key="doc.id" :value="doc.id">
-                {{ doc.name }} ({{ doc.specialization }}) &bull; Consultation: ${{ Number(doc.consultation_fee || 75).toFixed(0) }} | Report: ${{ Number(doc.followup_fee || 30).toFixed(0) }}
+              <option v-for="doc in filteredScheduleDoctors" :key="doc.id" :value="doc.id">
+                {{ doc.name }} &bull; {{ doc.department }} ({{ doc.specialization }}) &bull; Consultation: ${{ Number(doc.consultation_fee || 75).toFixed(0) }} | Report: ${{ Number(doc.followup_fee || 30).toFixed(0) }}
               </option>
             </select>
           </div>
@@ -603,6 +630,9 @@ const previewInvoice = ref(null);
 const searchQuery = ref(props.searchTerm || '');
 let searchTimer = null;
 
+const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'UNKNOWN'];
+const todayDate = computed(() => new Date().toISOString().split('T')[0]);
+
 const statusFilters = [
   { id: 'ALL', label: 'All Queue' },
   { id: 'SCHEDULED', label: 'Unpaid / Scheduled' },
@@ -611,12 +641,31 @@ const statusFilters = [
   { id: 'COMPLETED', label: 'Completed' },
 ];
 
+const walkInDept = ref('ALL');
+const scheduleDept = ref('ALL');
+
+const availableDoctorDepartments = computed(() => {
+  const depts = new Set((props.doctors || []).map(d => d.department).filter(Boolean));
+  return ['ALL', ...Array.from(depts)];
+});
+
+const filteredWalkInDoctors = computed(() => {
+  if (walkInDept.value === 'ALL') return props.doctors || [];
+  return (props.doctors || []).filter(d => d.department === walkInDept.value);
+});
+
+const filteredScheduleDoctors = computed(() => {
+  if (scheduleDept.value === 'ALL') return props.doctors || [];
+  return (props.doctors || []).filter(d => d.department === scheduleDept.value);
+});
+
 const walkInForm = useForm({
   first_name: '',
   last_name: '',
   phone: '',
   date_of_birth: '',
   gender: 'MALE',
+  blood_group: '',
   provider_id: '',
   visit_type: 'NEW_PATIENT',
   chief_complaint: '',

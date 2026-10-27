@@ -103,28 +103,61 @@ class PatientPortalController extends Controller
         $validated = $request->validate([
             'first_name' => 'required|string|max:100',
             'last_name' => 'required|string|max:100',
-            'date_of_birth' => 'required|date',
+            'date_of_birth' => 'required|date|before_or_equal:today',
             'gender' => 'required|in:MALE,FEMALE,OTHER',
-            'relationship_to_account_holder' => 'required|in:SELF,SPOUSE,CHILD,PARENT,OTHER',
+            'relationship_to_account_holder' => 'nullable|string|max:50',
             'blood_group' => 'nullable|string|max:10',
             'allergies' => 'nullable|string',
             'insurance_provider' => 'nullable|string|max:150',
             'insurance_policy_number' => 'nullable|string|max:100',
+            'emergency_contact_name' => 'nullable|string|max:100',
+            'emergency_contact_phone' => 'nullable|string|max:25',
+            'address' => 'nullable|string|max:255',
         ]);
 
         $validated['account_id'] = $account->id;
         $validated['phone'] = $account->phone_number;
+        $validated['relationship_to_account_holder'] = $validated['relationship_to_account_holder'] ?? 'PATIENT';
 
         $newPatient = Patient::create($validated);
 
         session()->put('active_patient_id', $newPatient->id);
 
-        AuditLogger::log('CREATE_FAMILY_MEMBER', 'Patient', $newPatient->id, [
+        AuditLogger::log('CREATE_PATIENT', 'Patient', $newPatient->id, [
             'name' => $newPatient->full_name,
-            'relationship' => $newPatient->relationship_to_account_holder,
         ]);
 
-        return redirect()->route('patient.dashboard')->with('success', "Added {$newPatient->full_name} to your household profiles.");
+        return redirect()->route('patient.dashboard')->with('success', "Patient {$newPatient->full_name} added successfully.");
+    }
+
+    public function updatePatient(Request $request, Patient $patient)
+    {
+        $accountId = session()->get('patient_account_id');
+        if (!$accountId || $patient->account_id !== $accountId) {
+            abort(403, 'Unauthorized to update this patient.');
+        }
+
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:100',
+            'last_name' => 'required|string|max:100',
+            'date_of_birth' => 'required|date|before_or_equal:today',
+            'gender' => 'required|in:MALE,FEMALE,OTHER',
+            'blood_group' => 'nullable|string|max:10',
+            'allergies' => 'nullable|string',
+            'insurance_provider' => 'nullable|string|max:150',
+            'insurance_policy_number' => 'nullable|string|max:100',
+            'emergency_contact_name' => 'nullable|string|max:100',
+            'emergency_contact_phone' => 'nullable|string|max:25',
+            'address' => 'nullable|string|max:255',
+        ]);
+
+        $patient->update($validated);
+
+        AuditLogger::log('UPDATE_PATIENT', 'Patient', $patient->id, [
+            'name' => $patient->full_name,
+        ]);
+
+        return redirect()->route('patient.dashboard')->with('success', "Patient {$patient->full_name} details updated successfully.");
     }
 
     public function bookAppointment(Request $request)

@@ -3,9 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Appointment;
 use App\Models\AuditLog;
+use App\Models\Encounter;
+use App\Models\Invoice;
 use App\Models\LabTestCatalog;
 use App\Models\MedicineCatalog;
+use App\Models\Patient;
+use App\Models\Prescription;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
@@ -19,14 +24,71 @@ class CatalogController extends Controller
     {
         $medicines = MedicineCatalog::latest()->get();
         $labTests = LabTestCatalog::latest()->get();
-        $auditLogs = AuditLog::latest('created_at')->take(60)->get();
-        $users = User::select('id', 'name', 'email', 'role', 'department', 'specialization', 'license_number', 'consultation_fee', 'followup_fee', 'is_active')->get();
+        $auditLogs = AuditLog::with('user:id,name,role')->latest('created_at')->take(80)->get();
+        $users = User::select('id', 'name', 'email', 'role', 'department', 'specialization', 'license_number', 'consultation_fee', 'followup_fee', 'is_active', 'phone')->get();
+
+        // All patients with full relationship history & appointment counts
+        $patients = Patient::with([
+                'appointments' => function ($q) {
+                    $q->with('provider:id,name,specialization')->orderBy('appointment_date', 'desc');
+                },
+                'encounters' => function ($q) {
+                    $q->with(['provider:id,name', 'diagnoses'])->orderBy('encounter_date', 'desc');
+                },
+                'prescriptions' => function ($q) {
+                    $q->with(['provider:id,name', 'items.medicine'])->orderBy('created_at', 'desc');
+                },
+                'labOrders' => function ($q) {
+                    $q->with(['provider:id,name', 'items.test'])->orderBy('created_at', 'desc');
+                },
+                'invoices' => function ($q) {
+                    $q->with('items')->orderBy('created_at', 'desc');
+                },
+            ])
+            ->withCount(['appointments', 'encounters', 'prescriptions', 'invoices'])
+            ->latest()
+            ->get();
+
+        // Complete Hospital Prescriptions Register
+        $prescriptions = Prescription::with([
+                'patient:id,first_name,last_name,mrn,phone,blood_group,gender,date_of_birth',
+                'provider:id,name,specialization,department',
+                'items.medicine'
+            ])
+            ->latest('created_at')
+            ->get();
+
+        // Complete Hospital Appointments Register
+        $appointments = Appointment::with([
+                'patient:id,first_name,last_name,mrn,phone,gender',
+                'provider:id,name,specialization,department',
+                'invoice'
+            ])
+            ->latest('appointment_date')
+            ->get();
+
+        // Summary Statistics for Executive Dashboard
+        $stats = [
+            'total_patients' => Patient::count(),
+            'total_appointments' => Appointment::count(),
+            'total_prescriptions' => Prescription::count(),
+            'total_encounters' => Encounter::count(),
+            'total_revenue' => (float) Invoice::where('payment_status', 'PAID')->sum('amount_paid'),
+            'total_doctors' => User::where('role', 'DOCTOR')->count(),
+            'total_staff' => User::count(),
+            'total_medicines' => MedicineCatalog::count(),
+            'total_lab_tests' => LabTestCatalog::count(),
+        ];
 
         return Inertia::render('Admin/Catalogs', [
             'medicines' => $medicines,
             'labTests' => $labTests,
             'auditLogs' => $auditLogs,
             'users' => $users,
+            'patients' => $patients,
+            'prescriptions' => $prescriptions,
+            'appointments' => $appointments,
+            'stats' => $stats,
         ]);
     }
 

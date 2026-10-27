@@ -70,6 +70,24 @@ class PatientAuthController extends Controller
         return back()->withErrors(['otp_code' => 'Invalid or expired OTP code. Use 123456 for demo.']);
     }
 
+    public function directDemoLogin(Request $request)
+    {
+        $phone = $request->phone_number ?: '+15551234567';
+        $account = PatientAccount::firstOrCreate(
+            ['phone_number' => $phone],
+            ['is_verified' => true]
+        );
+        $account->is_verified = true;
+        $account->save();
+
+        session()->put('patient_account_id', $account->id);
+        session()->put('patient_phone', $account->phone_number);
+
+        AuditLogger::log('PATIENT_DIRECT_DEMO_LOGIN', 'PatientAccount', $account->id);
+
+        return redirect()->route('patient.dashboard')->with('success', 'Welcome to your Patient Portal!');
+    }
+
     public function logout(Request $request)
     {
         $accountId = session()->get('patient_account_id');

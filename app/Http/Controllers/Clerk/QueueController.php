@@ -73,7 +73,7 @@ class QueueController extends Controller
         $validated = $request->validate([
             'first_name' => 'required|string|max:100',
             'last_name' => 'required|string|max:100',
-            'date_of_birth' => 'required|date',
+            'date_of_birth' => 'required|date|before_or_equal:today',
             'gender' => 'required|in:MALE,FEMALE,OTHER',
             'phone' => 'required|string|max:25',
             'blood_group' => 'nullable|string|max:10',

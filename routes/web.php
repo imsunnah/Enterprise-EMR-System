@@ -38,6 +38,8 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Patient Phone Portal Authentication
 Route::get('/portal/login', [PatientAuthController::class, 'show'])->name('patient.login');
+Route::get('/patient/login', [PatientAuthController::class, 'show'])->name('patient.login.direct');
+Route::post('/portal/demo-login', [PatientAuthController::class, 'directDemoLogin'])->name('patient.demo_login');
 Route::post('/portal/otp/request', [PatientAuthController::class, 'requestOtp'])->name('patient.otp.request');
 Route::post('/portal/otp/verify', [PatientAuthController::class, 'verifyOtp'])->name('patient.otp.verify');
 Route::post('/portal/logout', [PatientAuthController::class, 'logout'])->name('patient.logout');
@@ -47,6 +49,7 @@ Route::prefix('portal')->name('patient.')->group(function () {
     Route::get('/dashboard', [PatientPortalController::class, 'dashboard'])->name('dashboard');
     Route::post('/switch-profile', [PatientPortalController::class, 'switchProfile'])->name('switch_profile');
     Route::post('/add-member', [PatientPortalController::class, 'addFamilyMember'])->name('add_member');
+    Route::put('/patient/{patient}', [PatientPortalController::class, 'updatePatient'])->name('update_patient');
     Route::post('/book-appointment', [PatientPortalController::class, 'bookAppointment'])->name('book_appointment');
 });
 

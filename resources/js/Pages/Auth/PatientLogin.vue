@@ -10,8 +10,53 @@
       <p class="mt-2 text-sm text-sky-200">Access and manage medical records for your entire household with one phone number.</p>
     </div>
 
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+    <div class="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
+      <!-- 2 Direct Login Switcher Tabs -->
+      <div class="grid grid-cols-2 p-1 bg-slate-900/90 rounded-2xl border border-slate-700/80 mb-5 shadow-inner">
+        <Link
+          href="/login"
+          class="py-2.5 px-3 text-center text-xs font-bold rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-center gap-1.5"
+        >
+          <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          Staff & Doctor Login
+        </Link>
+        <Link
+          href="/patient/login"
+          class="py-2.5 px-3 text-center text-xs font-bold rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 text-white shadow-md flex items-center justify-center gap-1.5"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          Direct Patient Login
+        </Link>
+      </div>
+
       <div class="bg-slate-800/80 backdrop-blur-xl border border-sky-700/40 py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
+        <!-- Direct 1-Click Patient Portal Access -->
+        <div class="mb-6 p-4 rounded-xl bg-sky-950/70 border border-sky-800/80 text-center">
+          <p class="text-xs font-semibold uppercase tracking-wider text-sky-300 mb-1">Instant Demo Testing</p>
+          <p class="text-xs text-slate-300 mb-3">Jump directly into the Patient Portal without entering an SMS code:</p>
+          <button
+            @click="directLogin"
+            :disabled="directForm.processing"
+            type="button"
+            class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition flex items-center justify-center gap-2"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            1-Click Direct Patient Login (+15551234567)
+          </button>
+        </div>
+
+        <div class="relative flex py-2 items-center mb-4">
+          <div class="flex-grow border-t border-slate-700"></div>
+          <span class="flex-shrink mx-3 text-[10px] uppercase tracking-wider text-slate-400 font-bold">Or Sign In with Phone OTP</span>
+          <div class="flex-grow border-t border-slate-700"></div>
+        </div>
+
         <!-- Step 1: Request OTP -->
         <div v-if="step === 1" class="space-y-4">
           <div>
@@ -33,17 +78,6 @@
           >
             {{ phoneForm.processing ? 'Sending Code...' : 'Send 6-Digit SMS Code' }}
           </button>
-
-          <!-- Quick Fill Button -->
-          <div class="pt-2 text-center">
-            <button
-              @click="quickDemoFill"
-              type="button"
-              class="text-xs text-teal-400 hover:text-teal-300 underline font-medium"
-            >
-              Autofill Sample Family Phone ({{ samplePhone }})
-            </button>
-          </div>
         </div>
 
         <!-- Step 2: Verify OTP -->
@@ -82,7 +116,7 @@
             href="/login"
             class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition"
           >
-            &larr; Switch to Staff Login (Doctors, Nurses, Clerks)
+            &larr; Switch to Staff & Doctor Login
           </Link>
         </div>
       </div>
@@ -92,7 +126,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, Link } from '@inertiajs/vue3';
 
 const props = defineProps({
   samplePhone: String,
@@ -100,14 +134,22 @@ const props = defineProps({
 
 const step = ref(1);
 
+const directForm = useForm({
+  phone_number: props.samplePhone || '+15551234567',
+});
+
 const phoneForm = useForm({
-  phone_number: '+15551234567',
+  phone_number: props.samplePhone || '+15551234567',
 });
 
 const verifyForm = useForm({
-  phone_number: '+15551234567',
+  phone_number: props.samplePhone || '+15551234567',
   otp_code: '123456',
 });
+
+const directLogin = () => {
+  directForm.post('/portal/demo-login');
+};
 
 const sendOtp = () => {
   phoneForm.post('/portal/otp/request', {
@@ -120,10 +162,5 @@ const sendOtp = () => {
 
 const verifyOtp = () => {
   verifyForm.post('/portal/otp/verify');
-};
-
-const quickDemoFill = () => {
-  phoneForm.phone_number = props.samplePhone || '+15551234567';
-  sendOtp();
 };
 </script>
